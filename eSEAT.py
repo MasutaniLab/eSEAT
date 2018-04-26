@@ -150,6 +150,7 @@ class eSEAT(OpenRTM_aist.DataFlowComponentBase, eSEAT_Gui, eSEAT_Core):
     def onActivated(self, ec_id):
         self.activated = True
         self.resetTimer()
+        self.stateTransfer(self.startstate)
         return RTC_OK
 
     #
