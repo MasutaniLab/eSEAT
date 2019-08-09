@@ -495,7 +495,7 @@ class eSEAT(OpenRTM_aist.DataFlowComponentBase, eSEAT_Gui, eSEAT_Core):
             self._logger.info("sending message to %s, %s" % (data,code))
             self._data[name].data = unicode(data)
 
-        elif (dtype == int  or dtype == float) and type(data) == dtype:
+        elif dtype == int  or dtype == float:
             try:
                 self._data[name].data = dtype(data)
             except:
