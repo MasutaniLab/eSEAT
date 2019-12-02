@@ -19,7 +19,9 @@
     </input>
     <button label="Send">
         <message sendto="str_out" input="main_mode:textIn" />
+        <!--
         <message sendto="web" input="main_mode:textIn" />
+        -->
     </button>
     <brk />
   

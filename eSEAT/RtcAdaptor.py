@@ -71,6 +71,12 @@ except:
 
 __version__="2.5"
 
+import OpenRTM_aist.version
+
+def rtm_version():
+    ver=OpenRTM_aist.version.openrtm_version.split(".")
+    return int(ver[0])*10000 + int(ver[1]) * 100 + int(ver[2])
+
 #########################################################################
 #
 #  Sprcification of eSEAT
@@ -106,11 +112,15 @@ class eSEATDataListener(OpenRTM_aist.ConnectorDataListenerT):
         self._ondata_thread=None
     
     def __call__(self, info, cdrdata):
-        data = OpenRTM_aist.ConnectorDataListenerT.__call__(self,
+        if rtm_version() < 20000:
+            data = OpenRTM_aist.ConnectorDataListenerT.__call__(self,
                         info, cdrdata, instantiateDataType(self._type))
-        
+        else:
+            data = cdrdata
         self._obj.onData(self._name, data)
 
+        return OpenRTM_aist.ConnectorListenerStatus.NO_CHANGE, data
+        
 #########################################################################
 #
 #
@@ -292,8 +302,13 @@ class eSEAT(OpenRTM_aist.DataFlowComponentBase, eSEAT_Gui, eSEAT_Core):
         self._datatype[name]=type
         self._data[name] = instantiateDataType(type)
         self._port[name] = OpenRTM_aist.InPort(name, self._data[name])
-        self._port[name].addConnectorDataListener(
+        if rtm_version() < 20000:
+            self._port[name].addConnectorDataListener(
                             OpenRTM_aist.ConnectorDataListenerType.ON_BUFFER_WRITE,
+                            eSEATDataListener(name, type, self))
+        else:
+            self._port[name].addConnectorDataListener(
+                            OpenRTM_aist.ConnectorDataListenerType.ON_RECEIVED,
                             eSEATDataListener(name, type, self))
         self.registerInPort(name, self._port[name])
 
@@ -434,19 +449,20 @@ class eSEAT(OpenRTM_aist.DataFlowComponentBase, eSEAT_Gui, eSEAT_Core):
         if s[-3:] == "Seq"     : seq = True
 
         dtype = str
-        if sys.version_info.major == 2 and s.count("WString")  : dtype = unicode
-        elif s.count("WString")  : dtype = str          
-        elif s.count("String") : dtype = str
-        elif s.count("Float")  : dtype = float
-        elif s.count("Double") : dtype = float
-        elif s.count("Short")  : dtype = int
-        elif s.count("Long")   : dtype = int
-        elif s.count("Octet")  : dtype = int
-        elif s.count("Char")   : dtype = str
-        elif s.count("Boolean"): dtype = int
-        else                   : dtype = eval("%s" % s)
+        if sys.version_info.major == 2 and s.count("TimedWString")  : dtype = unicode
+        elif s.count("TimedWString")  : dtype = str          
+        elif s.count("TimedString") : dtype = str
+        elif s.count("TimedFloat")  : dtype = float
+        elif s.count("TimedDouble") : dtype = float
+        elif s.count("TimedShort")  : dtype = int
+        elif s.count("TimedLong")   : dtype = int
+        elif s.count("TimedOctet")  : dtype = int
+        elif s.count("TimedChar")   : dtype = str
+        elif s.count("TimesBoolean"): dtype = int
+        else                   : dtype = eval("%s" % s, getGlobals())
 
-        return (eval("%s" % s), dtype, seq)
+        #print((eval("%s" % s, getGlobals()), dtype, seq))
+        return (eval("%s" % s, getGlobals()), dtype, seq)
 
     #
     #
@@ -505,13 +521,24 @@ class eSEAT(OpenRTM_aist.DataFlowComponentBase, eSEAT_Gui, eSEAT_Core):
         else:
             try:
                 if type(data) == str :
-                  self._data[name] = apply(dtype, eval(data))
+                  if sys.version_info.major == 2 :
+                    self._data[name] = apply(dtype, eval(data, getGlobals()))
+                  else:
+                    arg=eval(data, getGlobals())
+                    self._data[name] = dtype(*arg)
                 else:
                   self._data[name] = data
             except:
                 self._logger.error( "ERROR in send: %s %s" % (name , data))
                 return
 
+        try:
+            ctm=time.time()
+            self._data[name].tm.sec = int(ctm) 
+            self._data[name].tm.nsec = int((ctm - self._data[name].tm.sec) * 1000000000)
+        except:
+            pass
+        
         self.writeData(name)
 
     #
@@ -690,6 +717,11 @@ class eSEATManager:
         manager.unregisterComponent(self.comp)
 
         if self._scriptfile :
+            if os.path.basename(self._scriptfile).count(".seatml") == 0 : self._scriptfile += ".seatml"
+            if not os.path.exists(self._scriptfile):
+                if 'SEAT_ROOT' in os.environ and os.environ['SEAT_ROOT']:
+                    self._scriptfile = os.path.join(os.environ['SEAT_ROOT'], self._scriptfile)
+            
             ret = self.comp.loadSEATML(self._scriptfile)
             if ret : raise Exception("Error in moduleInit")
 
