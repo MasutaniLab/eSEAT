@@ -260,17 +260,20 @@ class eSEAT(OpenRTM_aist.DataFlowComponentBase, eSEAT_Gui, eSEAT_Core):
         if self.activated :
             self.resetTimer()
             try:
+                _state=self.currentstate
                 if isinstance(data, TimedString):
                     if sys.version_info.major == 2:
                         data.data = data.data.decode('utf-8')
                     else:
                         data.data = data.data.encode('raw-unicode-escape').decode()
                     self.processResult(name, data.data)
-                    self.processOnDataIn(name, data)
+                    if self.currentstate == _state:
+                        self.processOnDataIn(name, data)
                 elif isinstance(data, TimedWString):
                     data.data = data.data
                     self.processResult(name, data.data)
-                    self.processOnDataIn(name, data)
+                    if self.currentstate == _state:
+                        self.processOnDataIn(name, data)
                 else:
                     eSEAT_Core.onData(self, name, data)
             except:
